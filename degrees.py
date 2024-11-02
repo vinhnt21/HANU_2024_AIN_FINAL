@@ -83,49 +83,97 @@ def main():
             movie = movies[path[i + 1][0]]["title"]
             print(f"{i + 1}: {person1} and {person2} starred in {movie}")
 
-
 def shortest_path(source, target):
     """
     Returns the shortest list of (movie_id, person_id) pairs
-    that connect the source to the target.
+    that connect the source to the target using bidirectional search.
 
     If no possible path, returns None.
     """
-    # Initialize the frontier with the starting position
-    start = Node(state=source, parent=None, action=None)
-    frontier = QueueFrontier()
-    frontier.add(start)
 
-    # Initialize an empty explored set
-    explored = set()
+    # Early exit if source and target are the same
+    if source == target:
+        return []
 
-    # Loop until we find the solution or exhaust the frontier
-    while not frontier.empty():
-        # Remove a node from the frontier
-        node = frontier.remove()
+    # Initialize frontiers for bidirectional search
+    frontier_forward = QueueFrontier()
+    frontier_backward = QueueFrontier()
+    frontier_forward.add(Node(state=source, parent=None, action=None))
+    frontier_backward.add(Node(state=target, parent=None, action=None))
 
-        # If this node's state is the target, we have found the path
-        if node.state == target:
-            # Build the path by following parent nodes back to the source
-            path = []
-            while node.parent is not None:
-                path.append((node.action, node.state))
-                node = node.parent
-            path.reverse()  # Reverse the path to go from source to target
+    # Track explored states in both directions
+    explored_forward = {}
+    explored_backward = {}
+
+    # Loop until either frontier is empty or paths meet
+    while not frontier_forward.empty() and not frontier_backward.empty():
+
+        # Expand the forward frontier
+        path = search_step(frontier_forward, explored_forward, explored_backward, direction="forward")
+        if path is not None:
             return path
 
-        # Mark this node as explored
-        explored.add(node.state)
-
-        # Add neighbors to the frontier
-        for movie_id, person_id in neighbors_for_person(node.state):
-            if not frontier.contains_state(person_id) and person_id not in explored:
-                child = Node(state=person_id, parent=node, action=movie_id)
-                frontier.add(child)
+        # Expand the backward frontier
+        path = search_step(frontier_backward, explored_backward, explored_forward, direction="backward")
+        if path is not None:
+            return path
 
     # If no path is found
     return None
 
+
+def search_step(frontier, explored, other_explored, direction):
+    """
+    Performs a single step in the search for bidirectional search.
+    Checks if there is a path by seeing if the node in the frontier
+    intersects with nodes explored in the opposite direction.
+    """
+    if frontier.empty():
+        return None
+
+    node = frontier.remove()
+    explored[node.state] = node  # Mark node as explored
+
+    # Check if this node connects with the other search
+    if node.state in other_explored:
+        # Found a connection point
+        path = build_path(node, other_explored[node.state], direction)
+        return path
+
+    # Expand neighbors
+    for movie_id, person_id in neighbors_for_person(node.state):
+        if person_id not in explored and not frontier.contains_state(person_id):
+            child = Node(state=person_id, parent=node, action=movie_id)
+            frontier.add(child)
+
+    return None
+
+
+def build_path(node_forward, node_backward, direction):
+    """
+    Builds the path from source to target by connecting the nodes
+    from the forward and backward searches at the intersection point.
+    """
+    # Path from start to intersection
+    path_forward = []
+    node = node_forward
+    while node.parent is not None:
+        path_forward.append((node.action, node.state))
+        node = node.parent
+    path_forward.reverse()  # Make it go from source to intersection
+
+    # Path from intersection to end
+    path_backward = []
+    node = node_backward
+    while node.parent is not None:
+        path_backward.append((node.action, node.state))
+        node = node.parent
+
+    # Merge paths, considering the search direction
+    if direction == "forward":
+        return path_forward + path_backward
+    else:
+        return path_backward + path_forward
 
 
 def person_id_for_name(name):
