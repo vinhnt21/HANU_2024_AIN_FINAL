@@ -62,15 +62,21 @@ def main():
     load_data(directory)
     print("Data loaded.")
 
-    source = person_id_for_name(input("Name: "))
+    # source = person_id_for_name(input("Name: "))
+    source = person_id_for_name("Ingmar Bergman")
     if source is None:
         sys.exit("Person not found.")
-    target = person_id_for_name(input("Name: "))
+    # target = person_id_for_name(input("Name: "))
+    target = person_id_for_name("Nino Rota")
     if target is None:
         sys.exit("Person not found.")
 
-    path = shortest_path(source, target)
-
+    # start time
+    import time
+    start = time.time()
+    path = shortest_path_bfs_simple(source, target)
+    end = time.time()
+    print(f"Execution time: {end - start} seconds.")
     if path is None:
         print("Not connected.")
     else:
@@ -83,64 +89,167 @@ def main():
             movie = movies[path[i + 1][0]]["title"]
             print(f"{i + 1}: {person1} and {person2} starred in {movie}")
 
-def shortest_path(source, target):
+
+def shortest_path_bfs_simple(source, target):
     """
-    Returns the shortest list of (movie_id, person_id) pairs
-    that connect the source to the target using bidirectional search.
+    Finds the shortest path between two nodes (source and target) using BFS.
 
-    If no possible path, returns None.
+    Args:
+        source: Starting node (person_id of source actor)
+        target: Target node (person_id of target actor)
+
+    Returns:
+        List of (movie_id, person_id) pairs representing the shortest path,
+        or None if no path exists.
     """
+    # Step 1: Initialize frontier with the starting node
+    start = Node(state=source, parent=None, action=None)
+    frontier = QueueFrontier()
+    frontier.add(start)
 
-    # Early exit if source and target are the same
-    if source == target:
-        return []
+    # Step 2: Create a set to keep track of explored nodes
+    explored = set()
 
-    # Initialize frontiers for bidirectional search
-    frontier_forward = QueueFrontier()
-    frontier_backward = QueueFrontier()
-    frontier_forward.add(Node(state=source, parent=None, action=None))
-    frontier_backward.add(Node(state=target, parent=None, action=None))
+    # Step counter
+    steps = 0
 
-    # Track explored states in both directions
-    explored_forward = {}
-    explored_backward = {}
+    # Step 3: Loop through the frontier
+    while not frontier.empty():
+        steps += 1
+        print(f"Step {steps}, Frontier size: {len(frontier.frontier)}, state {frontier.frontier[0].state}")
+        # Remove the node from the frontier
+        node = frontier.remove()
 
-    # Loop until either frontier is empty or paths meet
-    while not frontier_forward.empty() and not frontier_backward.empty():
-
-        # Expand the forward frontier
-        path = search_step(frontier_forward, explored_forward, explored_backward, direction="forward")
-        if path is not None:
+        # Check if target is reached
+        if node.state == target:
+            # Build the path by backtracking through parent nodes
+            path = []
+            while node.parent is not None:
+                path.append((node.action, node.state))
+                node = node.parent
+            path.reverse()  # Reverse path to go from source to target
+            print(f"Path found in {steps} steps.")
             return path
 
-        # Expand the backward frontier
-        path = search_step(frontier_backward, explored_backward, explored_forward, direction="backward")
-        if path is not None:
-            return path
+        # Mark the current node as explored
+        explored.add(node.state)
 
-    # If no path is found
+        # Expand node and add neighbors to frontier if not explored
+        for movie_id, person_id in neighbors_for_person(node.state):
+            if not frontier.contains_state(person_id) and person_id not in explored:
+                child = Node(state=person_id, parent=node, action=movie_id)
+                frontier.add(child)
+
+    # Return None if no path found
+    print(f"No path found after {steps} steps.")
     return None
 
 
+def shortest_path_bfs_pruning(source, target):
+    """
+    Returns the shortest list of (movie_id, person_id) pairs
+    that connect the source to the target using BFS with pruning.
+
+    If no possible path, returns None.
+    """
+    # Initialize the frontier with the starting position
+    start = Node(state=source, parent=None, action=None)
+    frontier = QueueFrontier()
+    frontier.add(start)
+
+    # Initialize an empty explored set
+    explored = set()
+
+    # Track shortest path length to each person to avoid unnecessary expansion
+    shortest_paths = {source: 0}
+
+    # Step counter
+    steps = 0
+
+    # Loop until we find the solution or exhaust the frontier
+    while not frontier.empty():
+        # Remove a node from the frontier
+        node = frontier.remove()
+        steps += 1  # Increment step count
+        print(f"Step {steps}: {node.state}")
+        # If this node's state is the target, we have found the path
+        if node.state == target:
+            # Build the path by following parent nodes back to the source
+            path = []
+            while node.parent is not None:
+                path.append((node.action, node.state))
+                node = node.parent
+            path.reverse()  # Reverse the path to go from source to target
+            print(f"Path found in {steps} steps.")
+            return path
+
+        # Mark this node as explored
+        explored.add(node.state)
+
+        # Add neighbors to the frontier with pruning
+        for movie_id, person_id in neighbors_for_person(node.state):
+            # Prune nodes if they’ve been visited in a shorter path
+            new_path_length = shortest_paths[node.state] + 1
+            if person_id not in explored and (
+                    person_id not in shortest_paths or new_path_length < shortest_paths[person_id]):
+                shortest_paths[person_id] = new_path_length
+                child = Node(state=person_id, parent=node, action=movie_id)
+                frontier.add(child)
+
+    # If no path is found
+    print(f"No path found after {steps} steps.")
+    return None
+
+
+def shortest_path_bidirectional(source, target):
+    start_frontier, goal_frontier = initialize_frontiers(source, target)
+    start_explored, goal_explored = initialize_explored_dicts(source, target)
+
+    # Step counter
+    steps = 0
+
+    while not start_frontier.empty() and not goal_frontier.empty():
+        steps += 1  # Increment step count
+        result = search_step(start_frontier, start_explored, goal_explored, "forward")
+        if result:
+            print(f"Path found in {steps} steps.")
+            return result
+
+        result = search_step(goal_frontier, goal_explored, start_explored, "backward")
+        if result:
+            print(f"Path found in {steps} steps.")
+            return result
+
+    # If no path is found
+    print(f"No path found after {steps} steps.")
+    return None
+
+
+def initialize_frontiers(source, target):
+    start_frontier = QueueFrontier()
+    goal_frontier = QueueFrontier()
+    start_frontier.add(Node(state=source, parent=None, action=None))
+    goal_frontier.add(Node(state=target, parent=None, action=None))
+    return start_frontier, goal_frontier
+
+
+def initialize_explored_dicts(source, target):
+    start_explored = {source: None}
+    goal_explored = {target: None}
+    return start_explored, goal_explored
+
+
 def search_step(frontier, explored, other_explored, direction):
-    """
-    Performs a single step in the search for bidirectional search.
-    Checks if there is a path by seeing if the node in the frontier
-    intersects with nodes explored in the opposite direction.
-    """
     if frontier.empty():
         return None
 
     node = frontier.remove()
-    explored[node.state] = node  # Mark node as explored
+    explored[node.state] = node
 
-    # Check if this node connects with the other search
     if node.state in other_explored:
-        # Found a connection point
         path = build_path(node, other_explored[node.state], direction)
         return path
 
-    # Expand neighbors
     for movie_id, person_id in neighbors_for_person(node.state):
         if person_id not in explored and not frontier.contains_state(person_id):
             child = Node(state=person_id, parent=node, action=movie_id)
@@ -150,26 +259,19 @@ def search_step(frontier, explored, other_explored, direction):
 
 
 def build_path(node_forward, node_backward, direction):
-    """
-    Builds the path from source to target by connecting the nodes
-    from the forward and backward searches at the intersection point.
-    """
-    # Path from start to intersection
     path_forward = []
     node = node_forward
     while node.parent is not None:
         path_forward.append((node.action, node.state))
         node = node.parent
-    path_forward.reverse()  # Make it go from source to intersection
+    path_forward.reverse()
 
-    # Path from intersection to end
     path_backward = []
     node = node_backward
     while node.parent is not None:
         path_backward.append((node.action, node.state))
         node = node.parent
 
-    # Merge paths, considering the search direction
     if direction == "forward":
         return path_forward + path_backward
     else:
