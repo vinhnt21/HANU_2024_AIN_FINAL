@@ -24,7 +24,7 @@ def load_data(directory):
             people[row["id"]] = {
                 "name": row["name"],
                 "birth": row["birth"],
-                "movies": set()
+                "movies": set(),
             }
             if row["name"].lower() not in names:
                 names[row["name"].lower()] = {row["id"]}
@@ -38,7 +38,7 @@ def load_data(directory):
             movies[row["id"]] = {
                 "title": row["title"],
                 "year": row["year"],
-                "stars": set()
+                "stars": set(),
             }
 
     # Load stars
@@ -63,18 +63,23 @@ def main():
     print("Data loaded.")
 
     # source = person_id_for_name(input("Name: "))
+    # source = person_id_for_name("Emma Watson")
     source = person_id_for_name("Ingmar Bergman")
     if source is None:
         sys.exit("Person not found.")
     # target = person_id_for_name(input("Name: "))
+    # target = person_id_for_name("Jennifer Lawrence")
     target = person_id_for_name("Nino Rota")
     if target is None:
         sys.exit("Person not found.")
 
     # start time
     import time
+
     start = time.time()
-    path = shortest_path_bfs_simple(source, target)
+    # path = shortest_path_bfs_simple(source, target)
+    path = shortest_path_bfs_pruning(source, target)
+    # path = shortest_path_bidirectional(source, target)
     end = time.time()
     print(f"Execution time: {end - start} seconds.")
     if path is None:
@@ -93,110 +98,77 @@ def main():
 def shortest_path_bfs_simple(source, target):
     """
     Finds the shortest path between two nodes (source and target) using BFS.
-
-    Args:
-        source: Starting node (person_id of source actor)
-        target: Target node (person_id of target actor)
-
-    Returns:
-        List of (movie_id, person_id) pairs representing the shortest path,
-        or None if no path exists.
     """
-    # Step 1: Initialize frontier with the starting node
     start = Node(state=source, parent=None, action=None)
     frontier = QueueFrontier()
     frontier.add(start)
-
-    # Step 2: Create a set to keep track of explored nodes
     explored = set()
+    steps = 0  # Step counter
 
-    # Step counter
-    steps = 0
-
-    # Step 3: Loop through the frontier
     while not frontier.empty():
         steps += 1
-        print(f"Step {steps}, Frontier size: {len(frontier.frontier)}, state {frontier.frontier[0].state}")
-        # Remove the node from the frontier
+        print(
+            f"Step {steps}, Frontier size: {len(frontier.frontier)}, state {frontier.frontier[0].state}"
+        )
         node = frontier.remove()
 
-        # Check if target is reached
         if node.state == target:
-            # Build the path by backtracking through parent nodes
             path = []
             while node.parent is not None:
                 path.append((node.action, node.state))
                 node = node.parent
-            path.reverse()  # Reverse path to go from source to target
+            path.reverse()
             print(f"Path found in {steps} steps.")
             return path
 
-        # Mark the current node as explored
         explored.add(node.state)
 
-        # Expand node and add neighbors to frontier if not explored
         for movie_id, person_id in neighbors_for_person(node.state):
             if not frontier.contains_state(person_id) and person_id not in explored:
                 child = Node(state=person_id, parent=node, action=movie_id)
                 frontier.add(child)
 
-    # Return None if no path found
     print(f"No path found after {steps} steps.")
     return None
 
 
 def shortest_path_bfs_pruning(source, target):
     """
-    Returns the shortest list of (movie_id, person_id) pairs
-    that connect the source to the target using BFS with pruning.
-
-    If no possible path, returns None.
+    Returns the shortest list of (movie_id, person_id) pairs that connect the source to the target using BFS with pruning.
     """
-    # Initialize the frontier with the starting position
     start = Node(state=source, parent=None, action=None)
     frontier = QueueFrontier()
     frontier.add(start)
-
-    # Initialize an empty explored set
     explored = set()
-
-    # Track shortest path length to each person to avoid unnecessary expansion
     shortest_paths = {source: 0}
+    steps = 0  # Step counter
 
-    # Step counter
-    steps = 0
-
-    # Loop until we find the solution or exhaust the frontier
     while not frontier.empty():
-        # Remove a node from the frontier
         node = frontier.remove()
-        steps += 1  # Increment step count
+        steps += 1
         print(f"Step {steps}: {node.state}")
-        # If this node's state is the target, we have found the path
+
         if node.state == target:
-            # Build the path by following parent nodes back to the source
             path = []
             while node.parent is not None:
                 path.append((node.action, node.state))
                 node = node.parent
-            path.reverse()  # Reverse the path to go from source to target
+            path.reverse()
             print(f"Path found in {steps} steps.")
             return path
 
-        # Mark this node as explored
         explored.add(node.state)
 
-        # Add neighbors to the frontier with pruning
         for movie_id, person_id in neighbors_for_person(node.state):
-            # Prune nodes if they’ve been visited in a shorter path
             new_path_length = shortest_paths[node.state] + 1
             if person_id not in explored and (
-                    person_id not in shortest_paths or new_path_length < shortest_paths[person_id]):
+                person_id not in shortest_paths
+                or new_path_length < shortest_paths[person_id]
+            ):
                 shortest_paths[person_id] = new_path_length
                 child = Node(state=person_id, parent=node, action=movie_id)
                 frontier.add(child)
 
-    # If no path is found
     print(f"No path found after {steps} steps.")
     return None
 
@@ -204,12 +176,9 @@ def shortest_path_bfs_pruning(source, target):
 def shortest_path_bidirectional(source, target):
     start_frontier, goal_frontier = initialize_frontiers(source, target)
     start_explored, goal_explored = initialize_explored_dicts(source, target)
-
-    # Step counter
-    steps = 0
-
+    steps = 0  # Step counter
     while not start_frontier.empty() and not goal_frontier.empty():
-        steps += 1  # Increment step count
+        steps += 1
         result = search_step(start_frontier, start_explored, goal_explored, "forward")
         if result:
             print(f"Path found in {steps} steps.")
@@ -220,7 +189,6 @@ def shortest_path_bidirectional(source, target):
             print(f"Path found in {steps} steps.")
             return result
 
-    # If no path is found
     print(f"No path found after {steps} steps.")
     return None
 
