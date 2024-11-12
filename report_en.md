@@ -58,7 +58,7 @@
 The `shortest_path` function was implemented using **Breadth-First Search (BFS)**. BFS explores nodes level-by-level to ensure the shortest path is found first. Nodes are added to a queue and processed until the target node is reached.
 
 ### Flow Chart
-![shortest_path_bfs_simple](./shortest_path_bfs_simple.png)
+- ![shortest_path_bfs_simple](./shortest_path_bfs_simple.png)
 
 ### Implementation
 
@@ -132,6 +132,8 @@ Due to the inefficiencies observed in the initial BFS implementation, we applied
 
 ### 4.1 BFS with Pruning
 - **Idea**: Use pruning to avoid redundant paths and reduce the search space by only expanding nodes that can lead to a shorter or unique path.
+- Flow Chart:
+  - ![Degrees Pruning](./shortest_path_bfs_pruning.png)
 - **Implement**:
   - **Code**:
     ```python
@@ -177,6 +179,8 @@ Due to the inefficiencies observed in the initial BFS implementation, we applied
 
 ### 4.2 Bidirectional Search
 - **Idea**: Perform BFS from both the source and target nodes simultaneously, reducing the search space by half and meeting at an intersection point.
+- Flow Chart:
+  - ![Degrees Bidirectional](./shortest_path_bfs_bidirectional.png)
 - **Implement**:
   - **Code**:
     ```python
